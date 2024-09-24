@@ -1,4 +1,4 @@
-# NOTENOW - Gestor Inteligente de Notas
+![Transparent Logo](logo.svg)
 
 ## Descripción
 

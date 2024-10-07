@@ -74,5 +74,3 @@ Con **Notely**, los usuarios pueden guardar notas en diferentes formatos (texto,
 Este proyecto está licenciado bajo la [Licencia MIT](LICENSE).
 
 ---
-
-Esta descripción proporciona toda la información esencial para que los usuarios entiendan el proyecto y lo instalen correctamente. Si lo deseas, puedes personalizar las secciones como la instalación según la estructura específica de tu repositorio.

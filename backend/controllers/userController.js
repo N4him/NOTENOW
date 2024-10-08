@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
 
 // Crear un nuevo usuario
 exports.createUser = async (req, res) => {
-  const { email, password, name, role } = req.body;
+  const { email, password, name } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -30,7 +30,6 @@ exports.createUser = async (req, res) => {
       email,
       password: hashedPassword,
       name,
-      role,
     });
 
     await user.save();
@@ -49,16 +48,6 @@ exports.createUser = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error del servidor' });
-  }
-};
-
-// Obtener todos los usuarios con rol 'user'
-exports.getUsers = async (req, res) => {
-  try {
-    const users = await User.find({ role: 'user' });
-    res.status(200).json(users);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching users' });
   }
 };
 

@@ -10,73 +10,104 @@ exports.getAllNotes = async (req, res) => {
   }
 };
 
-// Obtener una nota por ID
-exports.getNoteById = async (req, res) => {
-  try {
-    const note = await Note.findById(req.params.id);
-    if (!note) {
-      return res.status(404).json({ message: 'Nota no encontrada' });
-    }
-    res.status(200).json(note);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener la nota', error });
-  }
-};
-
-// Agregar una nueva nota
-exports.addNote = async (req, res) => {
-  const { title, content, category } = req.body;
+// Crear una nueva nota vinculada a un usuario
+exports.createNote = async (req, res) => {
+  const { title, content, category } = req.body;  // Incluir categoría
+  const userId = req.user.id; // El userId proviene del token JWT
 
   try {
     const newNote = new Note({
       title,
       content,
-      category
+      category, // Guardar categoría
+      user: userId, // Asociamos la nota al usuario autenticado
     });
 
-    const savedNote = await newNote.save();
-    res.status(201).json(savedNote);
+    await newNote.save();
+    res.status(201).json({ message: 'Nota creada con éxito', note: newNote });
   } catch (error) {
-    res.status(500).json({ message: 'Error al agregar la nota', error });
+    console.error(error);
+    res.status(500).json({ message: 'Error al crear la nota' });
   }
 };
 
-// Editar una nota existente
-exports.editNote = async (req, res) => {
-  const { title, content, category } = req.body;
+// Obtener todas las notas de un usuario
+exports.getNotesByUser = async (req, res) => {
+  const userId = req.user.id; // El userId proviene del token JWT
 
   try {
-    const updatedNote = await Note.findByIdAndUpdate(
-      req.params.id,
-      { title, content, category },
-      { new: true, runValidators: true } // Retorna la nota actualizada
-    );
+    const notes = await Note.find({ user: userId }); // Filtrar por el ID del usuario
 
-    if (!updatedNote) {
-      return res.status(404).json({ message: 'Nota no encontrada' });
+    if (!notes.length) {
+      return res.status(404).json({ message: 'No se encontraron notas para este usuario' });
     }
 
-    res.status(200).json(updatedNote);
+    res.status(200).json(notes);
   } catch (error) {
-    res.status(500).json({ message: 'Error al editar la nota', error });
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener las notas' });
   }
 };
 
-// Eliminar una nota por su ID
-exports.deleteNote = async (req, res) => {
-    const { id } = req.params;
-  
-    try {
-      const note = await Note.findByIdAndDelete(id);
-  
-      if (!note) {
-        return res.status(404).json({ message: 'Nota no encontrada' });
-      }
-  
-      res.status(200).json({ message: 'Nota eliminada con éxito' });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Error del servidor' });
+// Obtener una nota por su ID (asegurarse de que pertenezca al usuario autenticado)
+exports.getNoteById = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id; // El userId proviene del token JWT
+
+  try {
+    const note = await Note.findOne({ _id: id, user: userId });
+
+    if (!note) {
+      return res.status(404).json({ message: 'Nota no encontrada o no pertenece a este usuario' });
     }
-  };
+
+    res.status(200).json(note);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener la nota' });
+  }
+};
+
+// Editar una nota (asegurarse de que pertenezca al usuario autenticado)
+exports.updateNote = async (req, res) => {
+  const { id } = req.params;
+  const { title, content, category } = req.body; // Incluir categoría
+  const userId = req.user.id; // El userId proviene del token JWT
+
+  try {
+    const note = await Note.findOneAndUpdate(
+      { _id: id, user: userId }, // Asegurarse de que la nota pertenece al usuario
+      { title, content, category }, // Actualizar título, contenido y categoría
+      { new: true }
+    );
+
+    if (!note) {
+      return res.status(404).json({ message: 'Nota no encontrada o no pertenece a este usuario' });
+    }
+
+    res.status(200).json({ message: 'Nota actualizada con éxito', note });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al actualizar la nota' });
+  }
+};
+
+// Eliminar una nota (asegurarse de que pertenezca al usuario autenticado)
+exports.deleteNote = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id; // El userId proviene del token JWT
+
+  try {
+    const note = await Note.findOneAndDelete({ _id: id, user: userId });
+
+    if (!note) {
+      return res.status(404).json({ message: 'Nota no encontrada o no pertenece a este usuario' });
+    }
+
+    res.status(200).json({ message: 'Nota eliminada con éxito' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al eliminar la nota' });
+  }
+};
   

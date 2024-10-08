@@ -19,7 +19,12 @@ const noteSchema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Hace referencia al modelo de User
+    required: true,
+  },
 });
 
 // Crear el modelo de Nota a partir del esquema

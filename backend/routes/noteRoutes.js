@@ -1,21 +1,22 @@
 const express = require('express');
 const router = express.Router();
+const authenticateUser = require('../middleware/authMiddleware')
 const noteController = require('../controllers/noteController')
 
-// Ruta para obtener todas las notas
-router.get('/notes', noteController.getAllNotes);
+// Ruta para crear una nueva nota
+router.post('/notes', authenticateUser, noteController.createNote);
 
-// Ruta para obtener una nota específica por ID
-router.get('/notes/:id', noteController.getNoteById);
+// Ruta para obtener todas las notas del usuario autenticado
+router.get('/notes', authenticateUser, noteController.getNotesByUser);
 
-// Ruta para agregar una nueva nota
-router.post('/notes', noteController.addNote);
+// Ruta para obtener una nota por ID (solo si pertenece al usuario autenticado)
+router.get('/notes/:id', authenticateUser, noteController.getNoteById);
 
-// Ruta para editar una nota existente por ID
-router.put('/notes/:id', noteController.editNote);
+// Ruta para actualizar una nota (solo si pertenece al usuario autenticado)
+router.put('/notes/:id', authenticateUser, noteController.updateNote);
 
-// Ruta para eliminar una nota
-router.delete('/notes/:id', noteController.deleteNote);
+// Ruta para eliminar una nota (solo si pertenece al usuario autenticado)
+router.delete('/notes/:id', authenticateUser, noteController.deleteNote);
 
 
 

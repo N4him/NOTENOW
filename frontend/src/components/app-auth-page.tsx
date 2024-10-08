@@ -1,37 +1,40 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import Image from 'next/image'
-import { motion } from 'framer-motion'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ChevronRight } from 'lucide-react'
+import { useState } from 'react';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ChevronRight } from 'lucide-react';
 
 export function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true)
+  const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
   });
+  const [loggedIn, setLoggedIn] = useState(false); // Estado para controlar si el usuario está autenticado
 
   const toggleForm = () => {
-    setIsLogin(!isLogin)
-  }
+    setIsLogin(!isLogin);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: value
+      [id]: value,
     }));
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const url = isLogin ? 'http://localhost:5000/api/login' : 'http://localhost:5000/api/register';
-    const data = isLogin ? { email: formData.email, password: formData.password } : { name: formData.name, email: formData.email, password: formData.password };
+    const data = isLogin 
+      ? { email: formData.email, password: formData.password } 
+      : { name: formData.name, email: formData.email, password: formData.password };
 
     try {
       const response = await fetch(url, {
@@ -48,13 +51,20 @@ export function AuthPage() {
 
       const result = await response.json();
       console.log(result);
-      // Aquí puedes manejar la respuesta del backend (e.g., redireccionar, mostrar mensaje, etc.)
+
+      // Cambiar estado de autenticación
+      setLoggedIn(true); // Marcar como autenticado
+      
     } catch (error) {
       console.error('Error:', error);
       // Manejo de errores (mostrar mensaje al usuario, etc.)
     }
-  }
+  };
 
+  // Condicional para mostrar la página de inicio después del inicio de sesión
+  if (loggedIn) {
+    window.location.href = '/pages/user'; 
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 overflow-hidden">
@@ -148,5 +158,5 @@ export function AuthPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

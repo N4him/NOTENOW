@@ -29,7 +29,7 @@ export function LandingPage() {
               Con Notenow, toma notas de audio y deja que nuestra IA las organice por ti. Funciona en todos tus dispositivos, para que nunca pierdas una idea.
             </p>
             <div className="space-x-4">
-              <Link href={"/pages/signup"}>
+              <Link href={"/pages/user"}>
               <Button className="bg-blue-600 hover:bg-blue-700" >Comienza ahora</Button>
               
               <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">

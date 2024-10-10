@@ -1,4 +1,5 @@
 const Note = require('../models/noteModel'); // Importa el modelo de nota
+const mongoose = require('mongoose');
 
 // Obtener todas las notas
 exports.getAllNotes = async (req, res) => {
@@ -152,4 +153,30 @@ exports.deleteNote = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar la nota' });
   }
 };
+
+
+exports.getCategoriesByUser = async (req, res) => {
+  const userId = req.user.id; // El userId proviene del token JWT
+
+  try {
+    // Verificar que el userId sea un ObjectId válido
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'ID de usuario no válido' });
+    }
+
+    // Obtener las categorías únicas de las notas del usuario
+    const categories = await Note.distinct('category', { user: userId });
+
+    if (!categories.length) {
+      return res.status(404).json({ message: 'No se encontraron categorías para este usuario' });
+    }
+
+    res.status(200).json({ categories });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener las categorías' });
+  }
+};
+
+
   

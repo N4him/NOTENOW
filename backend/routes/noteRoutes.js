@@ -18,6 +18,9 @@ router.put('/notes/:id', authenticateUser, noteController.updateNote);
 // Ruta para eliminar una nota (solo si pertenece al usuario autenticado)
 router.delete('/notes/:id', authenticateUser, noteController.deleteNote);
 
+//Ruta para obtener todas las categorias que hay en las notas (solo si pertenece al usuario autenticado)
+router.get('/categories', authenticateUser, noteController.getCategoriesByUser)
+
 
 
 module.exports = router;

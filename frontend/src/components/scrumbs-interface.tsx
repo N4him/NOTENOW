@@ -229,7 +229,6 @@ export function ScrumbsInterface() {
       setCurrentPage((prevPage) => prevPage - 1);
     }
   };
-
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       <CreateNoteModal
@@ -288,7 +287,11 @@ export function ScrumbsInterface() {
             onChange={handleTextChange}
             placeholder="Escribe aquí..."
             rows={1}
-            className="bg-gray-800 text-white border-none resize-none overflow-hidden"
+            className="bg-gray-800 text-white border-none resize-none overflow-auto max-h-full w-full" // Added w-full to make it full width
+            style={{
+              overflowY: 'auto',
+              maxHeight: '78vh', // Calculate max height considering other elements
+            }} // Optional: You can also set a specific height
           />
           <div className="flex justify-between items-center mt-2">
             <Button onClick={handleMicClick}>

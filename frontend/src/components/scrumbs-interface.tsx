@@ -97,6 +97,8 @@ export function ScrumbsInterface() {
   const [currentPage, setCurrentPage] = useState(1); // Current page state
   const [totalPages, setTotalPages] = useState(1); // Total pages state
   const [searchQuery, setSearchQuery] = useState(""); // State for search query
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+
 
 
   useEffect(() => {
@@ -193,6 +195,34 @@ const filteredNotes = notes.filter(note =>
       setLoading(false);
     }
   };
+
+  const updateNote = async () => {
+    if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/notes/${selectedNoteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ content: text }), // Envía el contenido actualizado
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to update note: ${response.status}`);
+      }
+  
+      const updatedNote = await response.json();
+      console.log("Nota actualizada:", updatedNote);
+  
+      // Vuelve a cargar la lista de notas
+      fetchNotes();
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
+  };
+  
   
   
 
@@ -285,6 +315,12 @@ const filteredNotes = notes.filter(note =>
                   variant="ghost"
                   className="w-full justify-start text-left overflow-wrap break-words"
                   style={{ whiteSpace: "normal" }}
+                  onClick={() => {
+                    setText(note.content);
+                    setSelectedNoteId(note._id); // Guarda el ID de la nota seleccionada
+                  }}
+                  
+
                 >
                   {note.title}: {note.content}
                 </Button>
@@ -321,13 +357,10 @@ const filteredNotes = notes.filter(note =>
             <Button onClick={handleMicClick}>
               <Mic />
             </Button>
-            <Button
-              onClick={() => {
-                // Handle Save button click
-              }}
-            >
-              <Save />
-            </Button>
+            <Button onClick={updateNote}>
+  <Save />
+</Button>
+
             <Button>
               <Settings />
             </Button>

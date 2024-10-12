@@ -31,6 +31,8 @@ const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+
 
   const handleSave = () => {
     const note: Omit<Note, "_id"> = {
@@ -94,6 +96,8 @@ export function ScrumbsInterface() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1); // Current page state
   const [totalPages, setTotalPages] = useState(1); // Total pages state
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -143,15 +147,25 @@ export function ScrumbsInterface() {
       setIsRecording(true);
     }
   };
+  
+  // Filter notes based on the search query
+const filteredNotes = notes.filter(note => 
+  note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  note.content.toLowerCase().includes(searchQuery.toLowerCase())
+);
+
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
   };
 
-  const fetchNotes = async () => {
+  const fetchNotes = async (search = "") => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/notes?page=${currentPage}`, {
+      const pageQuery = search ? "" : `page=${currentPage}`;
+      const searchQuery = search ? `&search=${search}` : "";
+  
+      const response = await fetch(`http://localhost:5000/api/notes?${pageQuery}${searchQuery}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -168,7 +182,7 @@ export function ScrumbsInterface() {
       if (Array.isArray(data.notes)) {
         setNotes(data.notes);
         setError(null);
-        setTotalPages(data.pagination.totalPages);
+        setTotalPages(data.pagination?.totalPages || 1); // Solo usa paginación si no hay búsqueda
       } else {
         throw new Error("Response does not contain notes array");
       }
@@ -181,9 +195,14 @@ export function ScrumbsInterface() {
   };
   
   
+
+  console.log('*Compras\n\n Alimentos:\n\t+ Cereal\n\t+ Carne\n\t+ Huevos\n\t+ Comida para el perro y para el gato\n* Artículos de higiene:\n\t+ Papel higiénico\n\t+ Crema dental\n* Bebidas:\n\t+ Leche\n\n*Fin de mes\n\n Fecha límite: [fecha del fin de mes]\n* Presupuesto: 1.000.000 de pesos\n\n*Estructura*\n\nLa nota está organizada por categorías (compras, fin de mes) y subcategorías (alimentos, artículos de higiene, etc.) para facilitar la ubicación rápida y eficiente de la información.')
+  
+  
   useEffect(() => {
-    fetchNotes();
-  }, [currentPage]); // Fetch notes when current page changes
+    fetchNotes(searchQuery); // Pass the search query to fetchNotes
+  }, [currentPage, searchQuery]); // Include searchQuery in the dependencies
+  
 
   const createNote = async (note: Omit<Note, "_id">) => {
     try {
@@ -248,14 +267,19 @@ export function ScrumbsInterface() {
           >
             Nueva Nota
           </Button>
-          <Input placeholder="Busca tu nota" className="bg-gray-700" />
+          <Input 
+            placeholder="Busca tu nota" 
+            className="bg-gray-700" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)} // Update search query state
+          />
           <div className="space-y-1">
             {loading ? (
               <p>Cargando notas...</p>
             ) : error ? (
               <p className="text-red-500">{error}</p>
             ) : (
-              notes.map((note) => (
+              filteredNotes.map((note) => (
                 <Button
                   key={`${note._id}-${note.createdAt}`}
                   variant="ghost"

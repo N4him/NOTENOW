@@ -17,17 +17,10 @@ interface Note {
   category: string;
 }
 
-interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-}
-
-// Componente del modal para crear una nueva nota
 interface CreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (note: Omit<Note, "_id">) => void; // Cambiar a Omit para no incluir _id en el guardado
+  onSave: (note: Omit<Note, "_id">) => void;
 }
 
 const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
@@ -99,7 +92,8 @@ export function ScrumbsInterface() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [currentPage, setCurrentPage] = useState(1); // Current page state
+  const [totalPages, setTotalPages] = useState(1); // Total pages state
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -154,55 +148,52 @@ export function ScrumbsInterface() {
     setText(e.target.value);
   };
 
-  const fetchNotes = async (page: number = 2) => {
+  const fetchNotes = async () => {
     setLoading(true);
     try {
-        const response = await fetch(
-            `http://localhost:5000/api/notes?page=${page}`,
-            {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`Network error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Data received:", data); // Mostrar todos los datos recibidos
-
-        if (Array.isArray(data.notes)) {
-            setNotes(data.notes);
-            setPagination(data.pagination);
-            console.log("Pagination updated:", data.pagination); // Comprobar la paginación actualizada
-        } else {
-            throw new Error("Response does not contain notes array");
-        }
+      const response = await fetch(`http://localhost:5000/api/notes?page=${currentPage}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Network error: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      console.log("Data received:", data);
+  
+      if (Array.isArray(data.notes)) {
+        setNotes(data.notes);
+        setError(null);
+        setTotalPages(data.pagination.totalPages);
+      } else {
+        throw new Error("Response does not contain notes array");
+      }
     } catch (error) {
-        setError("No tienes notas aun, crea una nueva nota arriba :)");
-        console.error(error);
+      setError("No tienes notas aún, crea una nueva nota arriba :)");
+      console.error(error);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
-
-
+  };
+  
+  
+  useEffect(() => {
+    fetchNotes();
+  }, [currentPage]); // Fetch notes when current page changes
 
   const createNote = async (note: Omit<Note, "_id">) => {
     try {
-      // Obtén el ID de usuario de localStorage
-      const userId = localStorage.getItem("userId"); // Asegúrate de que userId esté guardado aquí
-
-      // Crea la nota incluyendo el ID del usuario
+      const userId = localStorage.getItem("userId");
       const noteWithUserId = {
         ...note,
-        userId: userId, // Usa el ID de usuario de localStorage
+        userId: userId,
       };
 
-      console.log("Cuerpo de la solicitud:", noteWithUserId); // Verifica qué se envía
+      console.log("Cuerpo de la solicitud:", noteWithUserId);
 
       const response = await fetch(`http://localhost:5000/api/notes`, {
         method: "POST",
@@ -218,45 +209,26 @@ export function ScrumbsInterface() {
       }
 
       const newNote = await response.json();
-      console.log("Nota creada:", newNote); // Verifica la nota creada
+      console.log("Nota creada:", newNote);
 
-      // Llama a fetchNotes para obtener la lista actualizada de notas
-      fetchNotes(); // Esta línea fue añadida
+      fetchNotes();
       setError(null);
     } catch (error) {
       setError("Error creating note: " + (error as Error).message);
     }
   };
 
-  useEffect(() => {
-    fetchNotes();
-  }, []);
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((prevPage) => prevPage + 1);
+    }
+  };
 
   const handlePreviousPage = () => {
-    if (pagination && pagination.page > 1) {
-        console.log("Página actual:", pagination.page); // Log de la página actual
-        console.log("Navegando a la página anterior:", pagination.page - 1); // Log de la página anterior
-        fetchNotes(pagination.page - 1);
-    } else {
-        console.log("No se puede navegar a la página anterior, ya estás en la primera página."); // Mensaje si ya estás en la primera página
+    if (currentPage > 1) {
+      setCurrentPage((prevPage) => prevPage - 1);
     }
-};
-
-const handleNextPage = () => {
-  if (pagination && pagination.page < Math.ceil(pagination.total / pagination.limit)) {
-    console.log("Página actual:", pagination.page); // Log de la página actual
-        console.log("Navegando a la siguiente página:", pagination.page + 1); // Log de la siguiente página
-        fetchNotes(pagination.page + 1);
-    } else {
-        console.log("No se puede navegar a la siguiente página, ya estás en la última página."); // Mensaje si ya estás en la última página
-    }
-};
-
-useEffect(() => {
-  console.log("Paginación actualizada:", pagination);
-}, [pagination]);
-
-
+  };
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
@@ -295,56 +267,45 @@ useEffect(() => {
                 </Button>
               ))
             )}
-            <div className="flex justify-between mt-4">
-            <button onClick={handlePreviousPage} disabled={!pagination || pagination.page <= 1}>Atrás</button>
-<button onClick={handleNextPage} disabled={!pagination || pagination.page >= Math.ceil(pagination.total / pagination.limit)}>Siguiente</button>
-
-            </div>
           </div>
         </div>
+        {/* Pagination Buttons */}
+        <div className="flex justify-between mt-4">
+          <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
+            Previous
+          </Button>
+          <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
+            Next
+          </Button>
+        </div>
       </div>
-
-      <div className="flex-1 flex flex-col">
-        <header className="flex justify-between items-center p-4 border-b border-gray-700">
-          <h2 className="text-xl">Lee Simon</h2>
-          <div className="flex items-center space-x-2">
-            <Avatar>
-              <AvatarImage src="/path/to/image.jpg" alt="Profile" />
-              <AvatarFallback>US</AvatarFallback>
-            </Avatar>
-            <Button onClick={handleMicClick}>
-              <Mic />
-              <span>{isRecording ? "Detener" : "Grabar"}</span>
-            </Button>
-          </div>
-        </header>
-        <main className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-4">
+        <h2 className="text-lg font-bold mb-2">Notas</h2>
+        <div className="border border-gray-600 p-4 rounded">
           <Textarea
             ref={textareaRef}
             value={text}
             onChange={handleTextChange}
-            placeholder="Escribe tu mensaje..."
-            className="resize-none overflow-hidden w-full h-full bg-gray-800 border border-gray-700"
+            placeholder="Escribe aquí..."
+            rows={1}
+            className="bg-gray-800 text-white border-none resize-none overflow-hidden"
           />
-        </main>
-        <footer className="p-4 border-t border-gray-700 flex justify-between items-center">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              /* Logic to save note */
-            }}
-          >
-            <Save />
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              /* Logic for settings */
-            }}
-          >
-            <Settings />
-          </Button>
-        </footer>
+          <div className="flex justify-between items-center mt-2">
+            <Button onClick={handleMicClick}>
+              <Mic />
+            </Button>
+            <Button
+              onClick={() => {
+                // Handle Save button click
+              }}
+            >
+              <Save />
+            </Button>
+            <Button>
+              <Settings />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

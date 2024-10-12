@@ -49,7 +49,8 @@ exports.createNote = async (req, res) => {
 // Ej de peticion: /api/notes?category=Estudio&title=tercera nota&limit=3&page=1
 exports.getNotesByUser = async (req, res) => {
   const userId = req.user.id; // El userId proviene del token JWT
-  const { category, title, page } = req.body; // Extraer los parámetros desde el body
+  const { category, title } = req.query; // Extraer parámetros desde los query params
+  const page = parseInt(req.query.page) || 1; // Obtener la página desde los query params
 
   const filter = { user: userId }; // Filtrar por el ID del usuario
 
@@ -103,6 +104,7 @@ exports.getNotesByUser = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener las notas' });
   }
 };
+
 
 
 // Obtener una nota por su ID (asegurarse de que pertenezca al usuario autenticado)

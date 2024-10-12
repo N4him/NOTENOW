@@ -16,7 +16,17 @@ exports.createNote = async (req, res) => {
   const { title, content, category } = req.body;  // Incluir categoría
   const userId = req.user.id; // El userId proviene del token JWT
 
+  // 1. Agregar logs para verificar la entrada
+  console.log('Request Body:', req.body);
+  console.log('User ID:', userId);
+
   try {
+    // 2. Validar que se recibieron todos los campos requeridos
+    if (!title || !content || !category) {
+      console.log('Error: Faltan campos requeridos');
+      return res.status(400).json({ message: 'Faltan campos requeridos' });
+    }
+
     const newNote = new Note({
       title,
       content,
@@ -25,12 +35,15 @@ exports.createNote = async (req, res) => {
     });
 
     await newNote.save();
+    console.log('Nota creada:', newNote);
     res.status(201).json({ message: 'Nota creada con éxito', note: newNote });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al crear la nota' });
+    // 3. Imprimir el error para diagnósticos
+    console.error('Error al crear la nota:', error);
+    res.status(500).json({ message: 'Error al crear la nota', error: error.message });
   }
 };
+
 
 // Obtener todas las notas de un usuario con paginación, filtrado por categoría y título
 // Ej de peticion: /api/notes?category=Estudio&title=tercera nota&limit=3&page=1

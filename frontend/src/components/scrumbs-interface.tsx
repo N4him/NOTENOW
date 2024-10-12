@@ -1,24 +1,100 @@
-"use client";
-
+'use client';
 import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mic, MoreVertical, Save, Settings } from "lucide-react";
-import { SpeechRecognitionService } from "../../../backend/utils/speechRecognition"; // Asegúrate de que la ruta sea correcta
+import { Mic, Save, Settings } from "lucide-react";
+import { SpeechRecognitionService } from "../../../backend/utils/speechRecognition";
 
-const DEBOUNCE_DELAY = 700; // Tiempo en ms para el debounce
+const DEBOUNCE_DELAY = 700;
+
+interface Note {
+  _id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  category: string;
+}
+
+interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// Componente del modal para crear una nueva nota
+interface CreateNoteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (note: Omit<Note, '_id'>) => void; // Cambiar a Omit para no incluir _id en el guardado
+}
+
+const CreateNoteModal: React.FC<CreateNoteModalProps> = ({ isOpen, onClose, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState('');
+
+  const handleSave = () => {
+    const note: Omit<Note, '_id'> = {
+      title,
+      content,
+      createdAt: new Date().toISOString(),
+      category,
+    };
+    onSave(note);
+    setTitle('');
+    setContent('');
+    setCategory('');
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50">
+      <div className="modal-content bg-white text-gray-900 p-4 rounded-md">
+        <h2 className="text-lg font-bold mb-4">Crear Nueva Nota</h2>
+        <Input
+          placeholder="Título de la nota"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="mb-2 bg-gray-200 border border-gray-300"
+        />
+        <Textarea
+          placeholder="Escribe el contenido de tu nota aquí..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="w-full min-h-[100px] bg-gray-200 border border-gray-300 text-black placeholder-gray-600 resize-none overflow-hidden"
+        />
+        <Input
+          placeholder="Etiquetas (separadas por comas)"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="mt-2 bg-gray-200 border border-gray-300"
+        />
+        <div className="flex justify-end mt-4 space-x-2">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave}>Guardar Nota</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export function ScrumbsInterface() {
-  const [text, setText] = useState(""); // Controla el contenido del textarea
-  const [isRecording, setIsRecording] = useState(false); // Controla si el micro está grabando
-  const textareaRef = useRef<HTMLTextAreaElement>(null); // Referencia al Textarea
-  const speechServiceRef = useRef<SpeechRecognitionService | null>(null); // Referencia al servicio de reconocimiento
-  const lastTranscriptRef = useRef(""); // Última transcripción para evitar duplicados
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Para almacenar el timeout
+  const [text, setText] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
+  const lastTranscriptRef = useRef("");
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
 
-  // Ajustar la altura del Textarea dinámicamente según su contenido
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -26,49 +102,41 @@ export function ScrumbsInterface() {
     }
   }, [text]);
 
-  // Inicializar el servicio de reconocimiento de voz
   useEffect(() => {
     speechServiceRef.current = new SpeechRecognitionService(
       (transcript: string) => {
-        // Verifica si la nueva transcripción es diferente de la última
         if (transcript !== lastTranscriptRef.current) {
           if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current); // Limpiar el timeout anterior
+            clearTimeout(debounceTimeoutRef.current);
           }
-          // Configurar un nuevo timeout
           debounceTimeoutRef.current = setTimeout(() => {
-            setText((prevText) => prevText + transcript + " "); // Actualizar el texto después del retraso
-            lastTranscriptRef.current = transcript; // Actualiza la última transcripción
+            setText((prevText) => prevText + transcript + " ");
+            lastTranscriptRef.current = transcript;
           }, DEBOUNCE_DELAY);
         }
       },
       () => {
-        // Cuando el reconocimiento termina, desactivar la grabación
         setIsRecording(false);
       }
     );
 
-    // Detener el reconocimiento al desmontar el componente
     return () => {
       if (speechServiceRef.current) {
         speechServiceRef.current.stop();
       }
       if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current); // Limpiar timeout en desmontar
+        clearTimeout(debounceTimeoutRef.current);
       }
     };
   }, []);
 
-  // Manejar el clic del botón del micrófono
   const handleMicClick = () => {
     if (isRecording) {
-      // Si está grabando, detener el reconocimiento
       if (speechServiceRef.current) {
         speechServiceRef.current.stop();
       }
       setIsRecording(false);
     } else {
-      // Si no está grabando, comenzar a grabar
       if (speechServiceRef.current) {
         speechServiceRef.current.start();
       }
@@ -76,95 +144,155 @@ export function ScrumbsInterface() {
     }
   };
 
-  // Manejar el cambio manual en el textarea
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
   };
 
+  const fetchNotes = async (page: number = 1) => {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notes?page=${page}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Network error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data.notes)) {
+        setNotes(data.notes);
+        setPagination(data.pagination);
+      } else {
+        throw new Error("Response does not contain notes array");
+      }
+    } catch (error) {
+      setError("Error loading notes: " + (error as Error).message);
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createNote = async (note: Omit<Note, '_id'>) => {
+    try {
+      // Obtén el ID de usuario de localStorage
+      const userId = localStorage.getItem('userId'); // Asegúrate de que userId esté guardado aquí
+  
+      // Crea la nota incluyendo el ID del usuario
+      const noteWithUserId = {
+        ...note,
+        userId: userId, // Usa el ID de usuario de localStorage
+      };
+  
+      console.log('Cuerpo de la solicitud:', noteWithUserId); // Verifica qué se envía
+  
+      const response = await fetch(`http://localhost:5000/api/notes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(noteWithUserId),
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to create note: ${response.status}`);
+      }
+  
+      const newNote = await response.json();
+      console.log('Nota creada:', newNote); // Verifica la nota creada
+  
+      // Llama a fetchNotes para obtener la lista actualizada de notas
+      fetchNotes();
+    } catch (error) {
+      setError("Error creating note: " + (error as Error).message);
+    }
+  };
+  
+  
+  
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      {/* Sidebar */}
+      <CreateNoteModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={createNote}
+      />
       <div className="w-64 bg-gray-800 p-4">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold">scrumbs</h1>
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
+          <h1 className="text-xl font-bold">Mi Notenow</h1>
         </div>
         <div className="space-y-2">
-          <Button variant="ghost" className="w-full justify-start">
-            .Teams
+          <Button variant="ghost" className="w-full justify-center" onClick={() => setIsModalOpen(true)}>
+            Nueva Nota
           </Button>
           <Input placeholder="Busca tu nota" className="bg-gray-700" />
           <div className="space-y-1">
-            {[
-              "Wiener Tov",
-              "EstelaCruz",
-              "Shea Connon",
-              "Gordon Hunt",
-              "Charles Hughes",
-              "Noemi Esbrois",
-              "Lee Simon",
-            ].map((name) => (
-              <Button
-                key={name}
-                variant="ghost"
-                className="w-full justify-start"
-              >
-                {name}
-              </Button>
-            ))}
+            {loading ? (
+              <p>Cargando notas...</p>
+            ) : error ? (
+              <p className="text-red-500">{error}</p>
+            ) : (
+              notes.map((note) => (
+                
+                <Button
+                key={`${note._id}-${note.createdAt}`}
+                  variant="ghost"
+                  className="w-full justify-start text-left overflow-wrap break-words"
+                  style={{ whiteSpace: "normal" }}
+                >
+                  {note.title}: {note.content}
+                </Button>
+                
+              ))
+              
+            )}
           </div>
         </div>
       </div>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col">
         <header className="flex justify-between items-center p-4 border-b border-gray-700">
           <h2 className="text-xl">Lee Simon</h2>
           <div className="flex items-center space-x-2">
             <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>LS</AvatarFallback>
+              <AvatarImage src="/path/to/image.jpg" alt="Profile" />
+              <AvatarFallback>US</AvatarFallback>
             </Avatar>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="h-5 w-5" />
+            <Button onClick={handleMicClick}>
+              <Mic />
+              <span>{isRecording ? "Detener" : "Grabar"}</span>
             </Button>
           </div>
         </header>
-        <main className="flex-1 flex flex-col p-4">
-          <div className="flex-1 flex items-stretch">
-            <Textarea
-              ref={textareaRef}
-              placeholder="Enter your text here"
-              value={text} // El valor del textarea es el texto transcrito
-              onChange={handleTextChange} // Maneja el cambio manual del texto
-              className="w-full min-h-[40px] bg-gray-800 border-gray-700 text-white placeholder-gray-400 focus:border-gray-500 resize-none overflow-hidden"
-              style={{ height: "auto" }}
-            />
-          </div>
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button
-              variant="outline"
-              size="icon"
-              className={`rounded-sm bg-white text-gray-900 hover:bg-gray-200 transition-colors ${
-                isRecording ? "bg-red-500" : ""
-              }`}
-              onClick={handleMicClick}
-            >
-              <Mic className="h-5 w-5" />
-              <span className="sr-only">Record audio</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-sm bg-white text-gray-900 hover:bg-gray-200 transition-colors"
-            >
-              <Save className="h-5 w-5" />
-              <span className="sr-only">Save note</span>
-            </Button>
-          </div>
+        <main className="flex-1 p-4 overflow-y-auto">
+          <Textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleTextChange}
+            placeholder="Escribe tu mensaje..."
+            className="resize-none overflow-hidden w-full h-full bg-gray-800 border border-gray-700"
+          />
         </main>
+        <footer className="p-4 border-t border-gray-700 flex justify-between items-center">
+          <Button variant="ghost" onClick={() => { /* Logic to save note */ }}>
+            <Save />
+          </Button>
+          <Button variant="ghost" onClick={() => { /* Logic for settings */ }}>
+            <Settings />
+          </Button>
+        </footer>
       </div>
     </div>
   );

@@ -52,8 +52,13 @@ export function AuthPage() {
       const result = await response.json();
       console.log(result);
 
-      // Cambiar estado de autenticación
-      setLoggedIn(true); // Marcar como autenticado
+      // Guarda el token en localStorage
+      if (result.token) {
+        localStorage.setItem('token', result.token); // Guarda el token en localStorage
+        setLoggedIn(true); // Marcar como autenticado
+      } else {
+        console.error('Token no recibido');
+      }
       
     } catch (error) {
       console.error('Error:', error);

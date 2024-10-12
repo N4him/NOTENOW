@@ -15,7 +15,8 @@ export function AuthPage() {
     password: '',
     name: '',
   });
-  const [loggedIn, setLoggedIn] = useState(false); // Estado para controlar si el usuario está autenticado
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [triggerAnimation, setTriggerAnimation] = useState(false); // Estado para activar la animación
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
@@ -52,16 +53,29 @@ export function AuthPage() {
       const result = await response.json();
       console.log(result);
 
-      // Cambiar estado de autenticación
-      setLoggedIn(true); // Marcar como autenticado
+      if (isLogin) {
+        // Manejar el inicio de sesión
+        if (result.token) {
+          localStorage.setItem('token', result.token);
+          setLoggedIn(true);
+        } else {
+          console.error('Token no recibido durante el inicio de sesión.');
+        }
+      } else {
+        // Manejar el registro exitoso
+        console.log('Registro exitoso:', result);
+        setTriggerAnimation(true); // Activa la animación al registrar
+        setTimeout(() => {
+          setIsLogin(true); // Cambia a la vista de inicio de sesión
+          setTriggerAnimation(false); // Reinicia la animación
+        }, 1000); // Tiempo de duración de la animación
+      }
       
     } catch (error) {
       console.error('Error:', error);
-      // Manejo de errores (mostrar mensaje al usuario, etc.)
     }
   };
 
-  // Condicional para mostrar la página de inicio después del inicio de sesión
   if (loggedIn) {
     window.location.href = '/pages/user'; 
   }

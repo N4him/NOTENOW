@@ -108,23 +108,31 @@ exports.getNotesByUser = async (req, res) => {
 
 
 // Obtener una nota por su ID (asegurarse de que pertenezca al usuario autenticado)
-exports.getNoteById = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id; // El userId proviene del token JWT
+exports.searchNotes = async (req, res) => {
+  const { query } = req.query; // Obtiene el parámetro de búsqueda de la consulta
+  const userId = req.user.id; // Obtiene el ID del usuario del token JWT
 
   try {
-    const note = await Note.findOne({ _id: id, user: userId });
-
-    if (!note) {
-      return res.status(404).json({ message: 'Nota no encontrada o no pertenece a este usuario' });
+    if (!query) {
+      return res.status(400).json({ message: 'El parámetro de búsqueda es obligatorio' });
     }
 
-    res.status(200).json(note);
+    // Busca notas que coincidan con la consulta y que pertenezcan al usuario autenticado
+    const notes = await Note.find({
+      user: userId, // Asegúrate de que las notas pertenezcan al usuario
+      $or: [
+        { title: { $regex: query, $options: 'i' } }, // Búsqueda por título
+        { content: { $regex: query, $options: 'i' } } // Búsqueda por contenido
+      ]
+    });
+
+    res.status(200).json(notes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error al obtener la nota' });
+    res.status(500).json({ message: 'Error al buscar notas' });
   }
 };
+
 
 // Editar una nota (asegurarse de que pertenezca al usuario autenticado)
 exports.updateNote = async (req, res) => {

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,25 +27,29 @@ interface Pagination {
 interface CreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (note: Omit<Note, '_id'>) => void; // Cambiar a Omit para no incluir _id en el guardado
+  onSave: (note: Omit<Note, "_id">) => void; // Cambiar a Omit para no incluir _id en el guardado
 }
 
-const CreateNoteModal: React.FC<CreateNoteModalProps> = ({ isOpen, onClose, onSave }) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState('');
+const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+}) => {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [category, setCategory] = useState("");
 
   const handleSave = () => {
-    const note: Omit<Note, '_id'> = {
+    const note: Omit<Note, "_id"> = {
       title,
       content,
       createdAt: new Date().toISOString(),
       category,
     };
     onSave(note);
-    setTitle('');
-    setContent('');
-    setCategory('');
+    setTitle("");
+    setContent("");
+    setCategory("");
     onClose();
   };
 
@@ -74,7 +78,9 @@ const CreateNoteModal: React.FC<CreateNoteModalProps> = ({ isOpen, onClose, onSa
           className="mt-2 bg-gray-200 border border-gray-300"
         />
         <div className="flex justify-end mt-4 space-x-2">
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave}>Guardar Nota</Button>
         </div>
       </div>
@@ -148,50 +154,56 @@ export function ScrumbsInterface() {
     setText(e.target.value);
   };
 
-  const fetchNotes = async (page: number = 1) => {
+  const fetchNotes = async (page: number = 2) => {
+    setLoading(true);
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/notes?page=${page}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+        const response = await fetch(
+            `http://localhost:5000/api/notes?page=${page}`,
+            {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Network error: ${response.status}`);
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(`Network error: ${response.status}`);
-      }
+        const data = await response.json();
+        console.log("Data received:", data); // Mostrar todos los datos recibidos
 
-      const data = await response.json();
-      if (Array.isArray(data.notes)) {
-        setNotes(data.notes);
-        setPagination(data.pagination);
-      } else {
-        throw new Error("Response does not contain notes array");
-      }
+        if (Array.isArray(data.notes)) {
+            setNotes(data.notes);
+            setPagination(data.pagination);
+            console.log("Pagination updated:", data.pagination); // Comprobar la paginación actualizada
+        } else {
+            throw new Error("Response does not contain notes array");
+        }
     } catch (error) {
-      setError("Error loading notes: " + (error as Error).message);
-      console.error(error);
+        setError("No tienes notas aun, crea una nueva nota arriba :)");
+        console.error(error);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
-  const createNote = async (note: Omit<Note, '_id'>) => {
+
+
+  const createNote = async (note: Omit<Note, "_id">) => {
     try {
       // Obtén el ID de usuario de localStorage
-      const userId = localStorage.getItem('userId'); // Asegúrate de que userId esté guardado aquí
-  
+      const userId = localStorage.getItem("userId"); // Asegúrate de que userId esté guardado aquí
+
       // Crea la nota incluyendo el ID del usuario
       const noteWithUserId = {
         ...note,
         userId: userId, // Usa el ID de usuario de localStorage
       };
-  
-      console.log('Cuerpo de la solicitud:', noteWithUserId); // Verifica qué se envía
-  
+
+      console.log("Cuerpo de la solicitud:", noteWithUserId); // Verifica qué se envía
+
       const response = await fetch(`http://localhost:5000/api/notes`, {
         method: "POST",
         headers: {
@@ -200,27 +212,51 @@ export function ScrumbsInterface() {
         },
         body: JSON.stringify(noteWithUserId),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Failed to create note: ${response.status}`);
       }
-  
+
       const newNote = await response.json();
-      console.log('Nota creada:', newNote); // Verifica la nota creada
-  
+      console.log("Nota creada:", newNote); // Verifica la nota creada
+
       // Llama a fetchNotes para obtener la lista actualizada de notas
-      fetchNotes();
+      fetchNotes(); // Esta línea fue añadida
+      setError(null);
     } catch (error) {
       setError("Error creating note: " + (error as Error).message);
     }
   };
-  
-  
-  
 
   useEffect(() => {
     fetchNotes();
   }, []);
+
+  const handlePreviousPage = () => {
+    if (pagination && pagination.page > 1) {
+        console.log("Página actual:", pagination.page); // Log de la página actual
+        console.log("Navegando a la página anterior:", pagination.page - 1); // Log de la página anterior
+        fetchNotes(pagination.page - 1);
+    } else {
+        console.log("No se puede navegar a la página anterior, ya estás en la primera página."); // Mensaje si ya estás en la primera página
+    }
+};
+
+const handleNextPage = () => {
+  if (pagination && pagination.page < Math.ceil(pagination.total / pagination.limit)) {
+    console.log("Página actual:", pagination.page); // Log de la página actual
+        console.log("Navegando a la siguiente página:", pagination.page + 1); // Log de la siguiente página
+        fetchNotes(pagination.page + 1);
+    } else {
+        console.log("No se puede navegar a la siguiente página, ya estás en la última página."); // Mensaje si ya estás en la última página
+    }
+};
+
+useEffect(() => {
+  console.log("Paginación actualizada:", pagination);
+}, [pagination]);
+
+
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
@@ -234,7 +270,11 @@ export function ScrumbsInterface() {
           <h1 className="text-xl font-bold">Mi Notenow</h1>
         </div>
         <div className="space-y-2">
-          <Button variant="ghost" className="w-full justify-center" onClick={() => setIsModalOpen(true)}>
+          <Button
+            variant="ghost"
+            className="w-full justify-center"
+            onClick={() => setIsModalOpen(true)}
+          >
             Nueva Nota
           </Button>
           <Input placeholder="Busca tu nota" className="bg-gray-700" />
@@ -245,19 +285,21 @@ export function ScrumbsInterface() {
               <p className="text-red-500">{error}</p>
             ) : (
               notes.map((note) => (
-                
                 <Button
-                key={`${note._id}-${note.createdAt}`}
+                  key={`${note._id}-${note.createdAt}`}
                   variant="ghost"
                   className="w-full justify-start text-left overflow-wrap break-words"
                   style={{ whiteSpace: "normal" }}
                 >
                   {note.title}: {note.content}
                 </Button>
-                
               ))
-              
             )}
+            <div className="flex justify-between mt-4">
+            <button onClick={handlePreviousPage} disabled={!pagination || pagination.page <= 1}>Atrás</button>
+<button onClick={handleNextPage} disabled={!pagination || pagination.page >= Math.ceil(pagination.total / pagination.limit)}>Siguiente</button>
+
+            </div>
           </div>
         </div>
       </div>
@@ -286,10 +328,20 @@ export function ScrumbsInterface() {
           />
         </main>
         <footer className="p-4 border-t border-gray-700 flex justify-between items-center">
-          <Button variant="ghost" onClick={() => { /* Logic to save note */ }}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              /* Logic to save note */
+            }}
+          >
             <Save />
           </Button>
-          <Button variant="ghost" onClick={() => { /* Logic for settings */ }}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              /* Logic for settings */
+            }}
+          >
             <Settings />
           </Button>
         </footer>

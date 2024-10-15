@@ -21,18 +21,18 @@ interface CreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (note: Omit<Note, "_id">) => void;
+  initialContent?: string; // New prop for passing initial content
 }
 
 const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  initialContent = "", // Default empty if no content passed
 }) => {
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(initialContent); // Start with initialContent
   const [category, setCategory] = useState("");
-  const [searchQuery, setSearchQuery] = useState(""); // State for search query
-
 
   const handleSave = () => {
     const note: Omit<Note, "_id"> = {
@@ -47,6 +47,10 @@ const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
     setCategory("");
     onClose();
   };
+
+  useEffect(() => {
+    setContent(initialContent); // Update content when initialContent changes
+  }, [initialContent]);
 
   if (!isOpen) return null;
 
@@ -87,6 +91,7 @@ export function ScrumbsInterface() {
   const [text, setText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [textareaContent, setTextareaContent] = useState(""); // For storing the textarea content before saving
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
   const lastTranscriptRef = useRef("");
@@ -94,12 +99,11 @@ export function ScrumbsInterface() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1); // Current page state
-  const [totalPages, setTotalPages] = useState(1); // Total pages state
-  const [searchQuery, setSearchQuery] = useState(""); // State for search query
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
+  const [selectedNoteContent, setSelectedNoteContent] = useState("");
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -107,7 +111,7 @@ export function ScrumbsInterface() {
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [text]);
-
+  
   useEffect(() => {
     speechServiceRef.current = new SpeechRecognitionService(
       (transcript: string) => {
@@ -116,7 +120,11 @@ export function ScrumbsInterface() {
             clearTimeout(debounceTimeoutRef.current);
           }
           debounceTimeoutRef.current = setTimeout(() => {
-            setText((prevText) => prevText + transcript + " ");
+            setText((prevText) => {
+              const updatedText = prevText + transcript + " ";
+              setSelectedNoteContent(updatedText); // Actualiza el contenido seleccionado
+              return updatedText;
+            });
             lastTranscriptRef.current = transcript;
           }, DEBOUNCE_DELAY);
         }
@@ -125,7 +133,7 @@ export function ScrumbsInterface() {
         setIsRecording(false);
       }
     );
-
+  
     return () => {
       if (speechServiceRef.current) {
         speechServiceRef.current.stop();
@@ -135,6 +143,8 @@ export function ScrumbsInterface() {
       }
     };
   }, []);
+  
+  
 
   const handleMicClick = () => {
     if (isRecording) {
@@ -149,13 +159,13 @@ export function ScrumbsInterface() {
       setIsRecording(true);
     }
   };
-  
-  // Filter notes based on the search query
-const filteredNotes = notes.filter(note => 
-  note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  note.content.toLowerCase().includes(searchQuery.toLowerCase())
-);
 
+  // Filter notes based on the search query
+  const filteredNotes = notes.filter(
+    (note) =>
+      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -166,21 +176,24 @@ const filteredNotes = notes.filter(note =>
     try {
       const pageQuery = search ? "" : `page=${currentPage}`;
       const searchQuery = search ? `&search=${search}` : "";
-  
-      const response = await fetch(`http://localhost:5000/api/notes?${pageQuery}${searchQuery}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-  
+
+      const response = await fetch(
+        `http://localhost:5000/api/notes?${pageQuery}${searchQuery}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
       if (!response.ok) {
         throw new Error(`Network error: ${response.status}`);
       }
-  
+
       const data = await response.json();
       console.log("Data received:", data);
-  
+
       if (Array.isArray(data.notes)) {
         setNotes(data.notes);
         setError(null);
@@ -196,43 +209,13 @@ const filteredNotes = notes.filter(note =>
     }
   };
 
-  const updateNote = async () => {
-    if (!selectedNoteId) return;
-  
-    try {
-      const response = await fetch(`http://localhost:5000/api/notes/${selectedNoteId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ content: text }), // Envía el contenido actualizado
-      });
-  
-      if (!response.ok) {
-        throw new Error(`Failed to update note: ${response.status}`);
-      }
-  
-      const updatedNote = await response.json();
-      console.log("Nota actualizada:", updatedNote);
-  
-      // Vuelve a cargar la lista de notas
-      fetchNotes();
-    } catch (error) {
-      console.error("Error updating note:", error);
-    }
-  };
-  
-  
-  
+  console.log(
+    "*Compras\n\n Alimentos:\n\t+ Cereal\n\t+ Carne\n\t+ Huevos\n\t+ Comida para el perro y para el gato\n* Artículos de higiene:\n\t+ Papel higiénico\n\t+ Crema dental\n* Bebidas:\n\t+ Leche\n\n*Fin de mes\n\n Fecha límite: [fecha del fin de mes]\n* Presupuesto: 1.000.000 de pesos\n\n*Estructura*\n\nLa nota está organizada por categorías (compras, fin de mes) y subcategorías (alimentos, artículos de higiene, etc.) para facilitar la ubicación rápida y eficiente de la información."
+  );
 
-  console.log('*Compras\n\n Alimentos:\n\t+ Cereal\n\t+ Carne\n\t+ Huevos\n\t+ Comida para el perro y para el gato\n* Artículos de higiene:\n\t+ Papel higiénico\n\t+ Crema dental\n* Bebidas:\n\t+ Leche\n\n*Fin de mes\n\n Fecha límite: [fecha del fin de mes]\n* Presupuesto: 1.000.000 de pesos\n\n*Estructura*\n\nLa nota está organizada por categorías (compras, fin de mes) y subcategorías (alimentos, artículos de higiene, etc.) para facilitar la ubicación rápida y eficiente de la información.')
-  
-  
   useEffect(() => {
     fetchNotes(searchQuery); // Pass the search query to fetchNotes
   }, [currentPage, searchQuery]); // Include searchQuery in the dependencies
-  
 
   const createNote = async (note: Omit<Note, "_id">) => {
     try {
@@ -241,8 +224,6 @@ const filteredNotes = notes.filter(note =>
         ...note,
         userId: userId,
       };
-
-      console.log("Cuerpo de la solicitud:", noteWithUserId);
 
       const response = await fetch(`http://localhost:5000/api/notes`, {
         method: "POST",
@@ -258,12 +239,10 @@ const filteredNotes = notes.filter(note =>
       }
 
       const newNote = await response.json();
-      console.log("Nota creada:", newNote);
-
       fetchNotes();
       setError(null);
     } catch (error) {
-      setError("Error creating note: " + (error as Error).message);
+      setError("Error creando la nota: " + (error as Error).message);
     }
   };
 
@@ -284,6 +263,7 @@ const filteredNotes = notes.filter(note =>
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={createNote}
+        initialContent={textareaContent} // Pass textarea content to modal
       />
       <div className="w-64 bg-gray-800 p-4">
         <div className="flex items-center justify-between mb-6">
@@ -297,9 +277,9 @@ const filteredNotes = notes.filter(note =>
           >
             Nueva Nota
           </Button>
-          <Input 
-            placeholder="Busca tu nota" 
-            className="bg-gray-700" 
+          <Input
+            placeholder="Busca tu nota"
+            className="bg-gray-700"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)} // Update search query state
           />
@@ -316,11 +296,9 @@ const filteredNotes = notes.filter(note =>
                   className="w-full justify-start text-left overflow-wrap break-words"
                   style={{ whiteSpace: "normal" }}
                   onClick={() => {
-                    setText(note.content);
-                    setSelectedNoteId(note._id); // Guarda el ID de la nota seleccionada
+                    setSelectedNoteTitle(note.title); // Actualiza el título seleccionado
+                    setSelectedNoteContent(note.content); // Actualiza el contenido seleccionado
                   }}
-                  
-
                 >
                   {note.title}: {note.content}
                 </Button>
@@ -333,36 +311,43 @@ const filteredNotes = notes.filter(note =>
           <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
             Previous
           </Button>
-          <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
+          <Button
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+          >
             Next
           </Button>
         </div>
       </div>
       <div className="flex-1 p-4">
-        <h2 className="text-lg font-bold mb-2">Notas</h2>
-        <div className="border border-gray-600 p-4 rounded">
+        <h1 className="text-xl font-bold">
+          {selectedNoteTitle || "Titulo de la nota"}
+        </h1>
+        <div className="mb-6">
           <Textarea
             ref={textareaRef}
-            value={text}
-            onChange={handleTextChange}
             placeholder="Escribe aquí..."
-            rows={1}
-            className="bg-gray-800 text-white border-none resize-none overflow-auto max-h-full w-full" // Added w-full to make it full width
-            style={{
-              overflowY: 'auto',
-              maxHeight: '78vh', // Calculate max height considering other elements
-            }} // Optional: You can also set a specific height
+            className="w-full min-h-[100px] bg-gray-800 border border-gray-700 text-white placeholder-gray-400 resize-none overflow-hidden"
+            value={selectedNoteContent} // Actualiza el contenido dinámicamente
+            onChange={(e) => setSelectedNoteContent(e.target.value)} // Permitir que el contenido se edite
           />
-          <div className="flex justify-between items-center mt-2">
-            <Button onClick={handleMicClick}>
-              <Mic />
-            </Button>
-            <Button onClick={updateNote}>
-  <Save />
-</Button>
 
-            <Button>
-              <Settings />
+          <div className="flex justify-end mt-2 space-x-2">
+            <Button
+              onClick={handleMicClick}
+              variant={isRecording ? "destructive" : "default"}
+            >
+              <Mic className="mr-2 h-4 w-4" />
+              {isRecording ? "Grabando..." : "Grabar"}
+            </Button>
+            <Button
+              onClick={() => {
+                setTextareaContent(text); // Save textarea content before opening modal
+                setIsModalOpen(true); // Open the modal
+              }}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Guardar
             </Button>
           </div>
         </div>

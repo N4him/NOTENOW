@@ -100,6 +100,10 @@ export function ScrumbsInterface() {
   const [searchQuery, setSearchQuery] = useState(""); // State for search query
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [errorCategories, setErrorCategories] = useState("");
 
 
 
@@ -111,6 +115,7 @@ export function ScrumbsInterface() {
   }, [text]);
 
   useEffect(() => {
+    fetchCategories();
     speechServiceRef.current = new SpeechRecognitionService(
       (transcript: string) => {
         if (transcript !== lastTranscriptRef.current) {
@@ -137,6 +142,19 @@ export function ScrumbsInterface() {
       }
     };
   }, []);
+  useEffect(() => {
+    // Obtener categorías únicas a partir de las notas actuales
+    const uniqueCategories = notes
+      .map(note => note.category)
+      .filter((category, index, self) => self.indexOf(category) === index); // Filtrar categorías únicas
+  
+    setCategories(uniqueCategories);
+  
+    // Si la categoría seleccionada ya no existe, resetea la selección
+    if (!uniqueCategories.includes(selectedCategory)) {
+      setSelectedCategory("");
+    }
+  }, [notes]); // Se actualiza cada vez que cambien las notas
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 const handleTitleClick = () => {
@@ -202,6 +220,7 @@ const updateNoteTitle = async (noteId: string | null, title: string) => {
     const updatedNote = await response.json();
     console.log("Título actualizado:", updatedNote);
     fetchNotes(); // Vuelve a cargar la lista de notas
+    fetchCategories();
   } catch (error) {
     console.error("Error updating title:", error);
   }
@@ -222,15 +241,36 @@ const updateNoteTitle = async (noteId: string | null, title: string) => {
   };
   
   // Filter notes based on the search query
-const filteredNotes = notes.filter(note => 
-  note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  note.content.toLowerCase().includes(searchQuery.toLowerCase())
-);
-
+  const filteredNotes = notes.filter((note) => {
+    const matchesCategory = selectedCategory === "" || note.category === selectedCategory;
+    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          note.content.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+const fetchCategories = async () => {
+  setLoadingCategories(true);
+  try {
+    const response = await fetch("http://localhost:5000/api/categories", {headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },});
+    if (!response.ok) {
+      throw new Error("Error al cargar categorías.");
+    }
+    const data = await response.json();
+    setCategories(data.categories);
+  } catch (error) {
+    setErrorCategories("Error al cargar categorías: " + error);
+  }
+  finally {
+    setLoadingCategories(false);
+  }
+};
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
   };
+  
 
   const fetchNotes = async (search = "") => {
     setLoading(true);
@@ -289,6 +329,7 @@ const filteredNotes = notes.filter(note =>
   
       // Vuelve a cargar la lista de notas
       fetchNotes();
+      fetchCategories();
     } catch (error) {
       console.error("Error updating note:", error);
     }
@@ -313,9 +354,19 @@ const filteredNotes = notes.filter(note =>
       setText(""); // Limpia el contenido de la nota
       setSelectedNoteTitle(""); // Limpia el título de la nota
       setSelectedNoteId(null); // Limpia el ID de la nota seleccionada
-  
+   // Actualizar el estado de las notas filtradas eliminando la nota
+   const updatedNotes = notes.filter((note) => note._id !== selectedNoteId);
+   setNotes(updatedNotes);
       // Vuelve a cargar la lista de notas
+      const hasNotesWithSelectedCategory = updatedNotes.some(
+        (note) => note.category === selectedCategory
+      );
+  
+      if (!hasNotesWithSelectedCategory) {
+        setSelectedCategory(""); // Restablecer la selección de categoría si ya no hay notas con esa categoría
+      }
       fetchNotes();
+      fetchCategories();
     } catch (error) {
       console.error("Error deleting note:", error);
     }
@@ -358,6 +409,7 @@ const filteredNotes = notes.filter(note =>
       console.log("Nota creada:", newNote);
 
       fetchNotes();
+      fetchCategories();
       setError(null);
     } catch (error) {
       setError("Error creating note: " + (error as Error).message);
@@ -381,60 +433,72 @@ const filteredNotes = notes.filter(note =>
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={createNote}  />
-      <div className="w-64 bg-gray-800 p-4">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold">Mi Notenow</h1>
-        </div>
-        <div className="space-y-2">
+    <div className="w-64 bg-gray-800 p-4">
+  <div className="flex items-center justify-between mb-6">
+    <h1 className="text-xl font-bold">Mi Notenow</h1>
+  </div>
+  <div className="space-y-2">
+    <Button
+      variant="ghost"
+      className="w-full justify-center"
+      onClick={() => setIsModalOpen(true)}
+    >
+      Nueva Nota
+    </Button>
+    <Input 
+      placeholder="Busca tu nota" 
+      className="bg-gray-700" 
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)} // Update search query state
+    />
+    {/* Combobox para seleccionar categoría */}
+    <select
+      className="bg-gray-700 w-full p-2 rounded text-white"
+      value={selectedCategory}
+      onChange={(e) => setSelectedCategory(e.target.value)} // Update selected category state
+    >
+      <option value="">Todas las categorías</option>
+      {categories.map((category) => (
+        <option key={category} value={category}>
+          {category}
+        </option>
+      ))}
+    </select>
+    <div className="space-y-1">
+      {loading ? (
+        <p>Cargando notas...</p>
+      ) : error ? (
+        <p className="text-red-500">{error}</p>
+      ) : (
+        filteredNotes.map((note) => (
           <Button
+            key={`${note._id}-${note.createdAt}`}
             variant="ghost"
-            className="w-full justify-center"
-            onClick={() => setIsModalOpen(true)}
+            className="w-full justify-start text-left overflow-wrap break-words"
+            style={{ whiteSpace: "normal" }}
+            onClick={() => {
+              setText(note.content);
+              setSelectedNoteId(note._id); // Guarda el ID de la nota seleccionada
+              setSelectedNoteTitle(note.title);
+            }}
           >
-            Nueva Nota
+            {note.title}: {note.content}
           </Button>
-          <Input 
-            placeholder="Busca tu nota" 
-            className="bg-gray-700" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)} // Update search query state
-          />
-          <div className="space-y-1">
-            {loading ? (
-              <p>Cargando notas...</p>
-            ) : error ? (
-              <p className="text-red-500">{error}</p>
-            ) : (
-              filteredNotes.map((note) => (
-                <Button
-                  key={`${note._id}-${note.createdAt}`}
-                  variant="ghost"
-                  className="w-full justify-start text-left overflow-wrap break-words"
-                  style={{ whiteSpace: "normal" }}
-                  onClick={() => {
-                    setText(note.content);
-                    setSelectedNoteId(note._id); // Guarda el ID de la nota seleccionada
-                    setSelectedNoteTitle(note.title); 
-                  }}
-                  
+        ))
+      )}
+    </div>
+  </div>
+  {/* Pagination Buttons */}
+  <div className="flex justify-between mt-4">
+    <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
+      Previous
+    </Button>
+    <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
+      Next
+    </Button>
+  </div>
+</div>
 
-                >
-                  {note.title}: {note.content}
-                </Button>
-              ))
-            )}
-          </div>
-        </div>
-        {/* Pagination Buttons */}
-        <div className="flex justify-between mt-4">
-          <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
-            Previous
-          </Button>
-          <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
-            Next
-          </Button>
-        </div>
-      </div>
       <div className="flex-1 p-4">
       <div>
   {isEditingTitle ? (

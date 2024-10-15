@@ -4,8 +4,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mic, Save, Settings } from "lucide-react";
+import { Mic, Save, Settings, Trash } from "lucide-react";
 import { SpeechRecognitionService } from "../../../backend/utils/speechRecognition";
+import { body } from "framer-motion/client";
 
 const DEBOUNCE_DELAY = 700;
 
@@ -20,17 +21,18 @@ interface Note {
 interface CreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (note: Omit<Note, "_id">) => void;
+  onSave: (note: Omit<Note, "_id">) => void
 }
 
 const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   isOpen,
   onClose,
-  onSave,
-}) => {
+  onSave, }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+
 
   const handleSave = () => {
     const note: Omit<Note, "_id"> = {
@@ -45,6 +47,7 @@ const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
     setCategory("");
     onClose();
   };
+
 
   if (!isOpen) return null;
 
@@ -94,6 +97,15 @@ export function ScrumbsInterface() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1); // Current page state
   const [totalPages, setTotalPages] = useState(1); // Total pages state
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteTitle, setSelectedNoteTitle] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [errorCategories, setErrorCategories] = useState("");
+
+
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -103,6 +115,7 @@ export function ScrumbsInterface() {
   }, [text]);
 
   useEffect(() => {
+    fetchCategories();
     speechServiceRef.current = new SpeechRecognitionService(
       (transcript: string) => {
         if (transcript !== lastTranscriptRef.current) {
@@ -129,6 +142,89 @@ export function ScrumbsInterface() {
       }
     };
   }, []);
+  useEffect(() => {
+    // Obtener categorías únicas a partir de las notas actuales
+    const uniqueCategories = notes
+      .map(note => note.category)
+      .filter((category, index, self) => self.indexOf(category) === index); // Filtrar categorías únicas
+  
+    setCategories(uniqueCategories);
+  
+    // Si la categoría seleccionada ya no existe, resetea la selección
+    if (!uniqueCategories.includes(selectedCategory)) {
+      setSelectedCategory("");
+    }
+  }, [notes]); // Se actualiza cada vez que cambien las notas
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+const handleTitleClick = () => {
+  setIsEditingTitle(true);
+};
+
+const handleIAClick = async () => {
+  //TODO Implementar la funcionalidad de IA
+  console.log("Consejo IA:", text);
+  //if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/upgradeNote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ content: text }), // Envía el contenido actualizado
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to upgrade note: ${response.status}`);
+      }
+  
+      const updatedNote = await response.json();
+      alert("Consejo IA: " + updatedNote.content);
+      console.log("Consejo IA:", updatedNote);
+  
+      // Vuelve a cargar la lista de notas
+      fetchNotes();
+    } catch (error) {
+      console.error("Error upgrading note:", error);
+    }
+};
+
+const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setSelectedNoteTitle(e.target.value);
+};
+
+const handleTitleBlur = async () => {
+  setIsEditingTitle(false);
+  await updateNoteTitle(selectedNoteId, selectedNoteTitle); // Llama a la función para guardar el título
+};
+
+const updateNoteTitle = async (noteId: string | null, title: string) => {
+  if (!noteId) return;
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/notes/${noteId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ title }), // Solo actualiza el título
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update title: ${response.status}`);
+    }
+
+    const updatedNote = await response.json();
+    console.log("Título actualizado:", updatedNote);
+    fetchNotes(); // Vuelve a cargar la lista de notas
+    fetchCategories();
+  } catch (error) {
+    console.error("Error updating title:", error);
+  }
+};
 
   const handleMicClick = () => {
     if (isRecording) {
@@ -143,15 +239,46 @@ export function ScrumbsInterface() {
       setIsRecording(true);
     }
   };
+  
+  // Filter notes based on the search query
+  const filteredNotes = notes.filter((note) => {
+    const matchesCategory = selectedCategory === "" || note.category === selectedCategory;
+    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          note.content.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+const fetchCategories = async () => {
+  setLoadingCategories(true);
+  try {
+    const response = await fetch("http://localhost:5000/api/categories", {headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },});
+    if (!response.ok) {
+      throw new Error("Error al cargar categorías.");
+    }
+    const data = await response.json();
+    setCategories(data.categories);
+  } catch (error) {
+    setErrorCategories("Error al cargar categorías: " + error);
+  }
+  finally {
+    setLoadingCategories(false);
+  }
+};
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
   };
+  
 
-  const fetchNotes = async () => {
+  const fetchNotes = async (search = "") => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/notes?page=${currentPage}`, {
+      const pageQuery = search ? "" : `page=${currentPage}`;
+      const searchQuery = search ? `&search=${search}` : "";
+  
+      const response = await fetch(`http://localhost:5000/api/notes?${pageQuery}${searchQuery}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -168,7 +295,7 @@ export function ScrumbsInterface() {
       if (Array.isArray(data.notes)) {
         setNotes(data.notes);
         setError(null);
-        setTotalPages(data.pagination.totalPages);
+        setTotalPages(data.pagination?.totalPages || 1); // Solo usa paginación si no hay búsqueda
       } else {
         throw new Error("Response does not contain notes array");
       }
@@ -179,11 +306,81 @@ export function ScrumbsInterface() {
       setLoading(false);
     }
   };
+
+  const updateNote = async () => {
+    if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/notes/${selectedNoteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ content: text }), // Envía el contenido actualizado
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to update note: ${response.status}`);
+      }
+  
+      const updatedNote = await response.json();
+      console.log("Nota actualizada:", updatedNote);
+  
+      // Vuelve a cargar la lista de notas
+      fetchNotes();
+      fetchCategories();
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
+  };
+  
+  const handleDeleteNote = async () => {
+    if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/notes/${selectedNoteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to delete note: ${response.status}`);
+      }
+  
+      console.log("Nota eliminada:", selectedNoteId);
+      setText(""); // Limpia el contenido de la nota
+      setSelectedNoteTitle(""); // Limpia el título de la nota
+      setSelectedNoteId(null); // Limpia el ID de la nota seleccionada
+   // Actualizar el estado de las notas filtradas eliminando la nota
+   const updatedNotes = notes.filter((note) => note._id !== selectedNoteId);
+   setNotes(updatedNotes);
+      // Vuelve a cargar la lista de notas
+      const hasNotesWithSelectedCategory = updatedNotes.some(
+        (note) => note.category === selectedCategory
+      );
+  
+      if (!hasNotesWithSelectedCategory) {
+        setSelectedCategory(""); // Restablecer la selección de categoría si ya no hay notas con esa categoría
+      }
+      fetchNotes();
+      fetchCategories();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
+  }
+  
+  
+
+  console.log('*Compras\n\n Alimentos:\n\t+ Cereal\n\t+ Carne\n\t+ Huevos\n\t+ Comida para el perro y para el gato\n* Artículos de higiene:\n\t+ Papel higiénico\n\t+ Crema dental\n* Bebidas:\n\t+ Leche\n\n*Fin de mes\n\n Fecha límite: [fecha del fin de mes]\n* Presupuesto: 1.000.000 de pesos\n\n*Estructura*\n\nLa nota está organizada por categorías (compras, fin de mes) y subcategorías (alimentos, artículos de higiene, etc.) para facilitar la ubicación rápida y eficiente de la información.')
   
   
   useEffect(() => {
-    fetchNotes();
-  }, [currentPage]); // Fetch notes when current page changes
+    fetchNotes(searchQuery); // Pass the search query to fetchNotes
+  }, [currentPage, searchQuery]); // Include searchQuery in the dependencies
+  
 
   const createNote = async (note: Omit<Note, "_id">) => {
     try {
@@ -212,6 +409,7 @@ export function ScrumbsInterface() {
       console.log("Nota creada:", newNote);
 
       fetchNotes();
+      fetchCategories();
       setError(null);
     } catch (error) {
       setError("Error creating note: " + (error as Error).message);
@@ -234,52 +432,95 @@ export function ScrumbsInterface() {
       <CreateNoteModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={createNote}
-      />
-      <div className="w-64 bg-gray-800 p-4">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold">Mi Notenow</h1>
-        </div>
-        <div className="space-y-2">
+        onSave={createNote}  />
+    <div className="w-64 bg-gray-800 p-4">
+  <div className="flex items-center justify-between mb-6">
+    <h1 className="text-xl font-bold">Mi Notenow</h1>
+  </div>
+  <div className="space-y-2">
+    <Button
+      variant="ghost"
+      className="w-full justify-center"
+      onClick={() => setIsModalOpen(true)}
+    >
+      Nueva Nota
+    </Button>
+    <Input 
+      placeholder="Busca tu nota" 
+      className="bg-gray-700" 
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)} // Update search query state
+    />
+    {/* Combobox para seleccionar categoría */}
+    <select
+      className="bg-gray-700 w-full p-2 rounded text-white"
+      value={selectedCategory}
+      onChange={(e) => setSelectedCategory(e.target.value)} // Update selected category state
+    >
+      <option value="">Todas las categorías</option>
+      {categories.map((category) => (
+        <option key={category} value={category}>
+          {category}
+        </option>
+      ))}
+    </select>
+    <div className="space-y-1">
+      {loading ? (
+        <p>Cargando notas...</p>
+      ) : error ? (
+        <p className="text-red-500">{error}</p>
+      ) : (
+        filteredNotes.map((note) => (
           <Button
+            key={`${note._id}-${note.createdAt}`}
             variant="ghost"
-            className="w-full justify-center"
-            onClick={() => setIsModalOpen(true)}
+            className="w-full justify-start text-left overflow-wrap break-words"
+            style={{ whiteSpace: "normal" }}
+            onClick={() => {
+              setText(note.content);
+              setSelectedNoteId(note._id); // Guarda el ID de la nota seleccionada
+              setSelectedNoteTitle(note.title);
+            }}
           >
-            Nueva Nota
+            {note.title}: {note.content}
           </Button>
-          <Input placeholder="Busca tu nota" className="bg-gray-700" />
-          <div className="space-y-1">
-            {loading ? (
-              <p>Cargando notas...</p>
-            ) : error ? (
-              <p className="text-red-500">{error}</p>
-            ) : (
-              notes.map((note) => (
-                <Button
-                  key={`${note._id}-${note.createdAt}`}
-                  variant="ghost"
-                  className="w-full justify-start text-left overflow-wrap break-words"
-                  style={{ whiteSpace: "normal" }}
-                >
-                  {note.title}: {note.content}
-                </Button>
-              ))
-            )}
-          </div>
-        </div>
-        {/* Pagination Buttons */}
-        <div className="flex justify-between mt-4">
-          <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
-            Previous
-          </Button>
-          <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
-            Next
-          </Button>
-        </div>
-      </div>
+        ))
+      )}
+    </div>
+  </div>
+  {/* Pagination Buttons */}
+  <div className="flex justify-between mt-4">
+    <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
+      Previous
+    </Button>
+    <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
+      Next
+    </Button>
+  </div>
+</div>
+
       <div className="flex-1 p-4">
-        <h2 className="text-lg font-bold mb-2">Notas</h2>
+      <div>
+  {isEditingTitle ? (
+    <input
+    type="text"
+    value={selectedNoteTitle}
+    onChange={handleTitleChange}
+    onBlur={handleTitleBlur}
+    autoFocus
+    className="text-xl font-bold border-b-2 border-blue-500 focus:outline-none w-full bg-transparent"
+  />
+  
+  ) : (
+    <h1
+      className="text-xl font-bold cursor-pointer"
+      onClick={handleTitleClick}
+    >
+      {selectedNoteTitle || "Titulo de la nota"}
+    </h1>
+  )}
+</div>
+
         <div className="border border-gray-600 p-4 rounded">
           <Textarea
             ref={textareaRef}
@@ -297,19 +538,18 @@ export function ScrumbsInterface() {
             <Button onClick={handleMicClick}>
               <Mic />
             </Button>
-            <Button
-              onClick={() => {
-                // Handle Save button click
-              }}
-            >
-              <Save />
-            </Button>
-            <Button>
+            <Button onClick={updateNote}>
+  <Save />
+</Button>
+
+            <Button onClick={handleIAClick}>
               <Settings />
+            </Button>
+            <Button onClick={handleDeleteNote}>
+              <Trash />
             </Button>
           </div>
         </div>
       </div>
     </div>
-  );
-}
+  )}

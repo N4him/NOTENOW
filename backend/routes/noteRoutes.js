@@ -10,7 +10,7 @@ router.post('/notes', authenticateUser, noteController.createNote);
 router.get('/notes', authenticateUser, noteController.getNotesByUser);
 
 // Ruta para obtener una nota por ID (solo si pertenece al usuario autenticado)
-router.get('/notes/:id', authenticateUser, noteController.getNoteById);
+router.get('/notes/search', authenticateUser, noteController.searchNotes);
 
 // Ruta para actualizar una nota (solo si pertenece al usuario autenticado)
 router.put('/notes/:id', authenticateUser, noteController.updateNote);

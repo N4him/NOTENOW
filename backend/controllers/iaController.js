@@ -4,7 +4,7 @@ const LlamaKey = process.env.LLAMAKEY
 const groq = new Groq({ apiKey:  LlamaKey});
 
 module.exports.getGroqChatCompletion = async (req, res) => {
-  const { nota } = req.body;
+  const nota = req.body.content;
 
   if (!nota) {
     return res.status(400).json({ error: "Nota requerida" });

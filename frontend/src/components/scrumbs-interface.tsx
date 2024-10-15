@@ -4,8 +4,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mic, Save, Settings } from "lucide-react";
+import { Mic, Save, Settings, Trash } from "lucide-react";
 import { SpeechRecognitionService } from "../../../backend/utils/speechRecognition";
+import { body } from "framer-motion/client";
 
 const DEBOUNCE_DELAY = 700;
 
@@ -142,6 +143,36 @@ const handleTitleClick = () => {
   setIsEditingTitle(true);
 };
 
+const handleIAClick = async () => {
+  //TODO Implementar la funcionalidad de IA
+  console.log("Consejo IA:", text);
+  //if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/upgradeNote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ content: text }), // Envía el contenido actualizado
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to upgrade note: ${response.status}`);
+      }
+  
+      const updatedNote = await response.json();
+      alert("Consejo IA: " + updatedNote.content);
+      console.log("Consejo IA:", updatedNote);
+  
+      // Vuelve a cargar la lista de notas
+      fetchNotes();
+    } catch (error) {
+      console.error("Error upgrading note:", error);
+    }
+};
+
 const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   setSelectedNoteTitle(e.target.value);
 };
@@ -263,6 +294,32 @@ const filteredNotes = notes.filter(note =>
     }
   };
   
+  const handleDeleteNote = async () => {
+    if (!selectedNoteId) return;
+  
+    try {
+      const response = await fetch(`http://localhost:5000/api/notes/${selectedNoteId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to delete note: ${response.status}`);
+      }
+  
+      console.log("Nota eliminada:", selectedNoteId);
+      setText(""); // Limpia el contenido de la nota
+      setSelectedNoteTitle(""); // Limpia el título de la nota
+      setSelectedNoteId(null); // Limpia el ID de la nota seleccionada
+  
+      // Vuelve a cargar la lista de notas
+      fetchNotes();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
+  }
   
   
 
@@ -421,8 +478,11 @@ const filteredNotes = notes.filter(note =>
   <Save />
 </Button>
 
-            <Button>
+            <Button onClick={handleIAClick}>
               <Settings />
+            </Button>
+            <Button onClick={handleDeleteNote}>
+              <Trash />
             </Button>
           </div>
         </div>
